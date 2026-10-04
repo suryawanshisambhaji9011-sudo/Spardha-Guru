@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="mr" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>स्पर्धा गुरु (Spardha Guru) - स्पर्धा परीक्षा सराव</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Firebase SDK Imports (Modular v9) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDrcdyjoniT-C2XLIgnX9Ils2bUsyAc19Y",
+            authDomain: "youtweet-b8bd8.firebaseapp.com",
+            projectId: "youtweet-b8bd8",
+            storageBucket: "youtweet-b8bd8.firebasestorage.app",
+            messagingSenderId: "804994377816",
+            appId: "1:804994377816:web:b86c412623d85e6f3cc22d",
+            measurementId: "G-NM2Q85VT5E"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        window.fbDB = db;
+        window.fbCollection = collection;
+        window.fbAddDoc = addDoc;
+        window.fbGetDocs = getDocs;
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen flex flex-col font-sans select-none">
+
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-800 text-white p-4 shadow-lg sticky top-0 z-50 flex justify-between items-center">
+        <div class="flex items-center space-x-3">
+            <div class="bg-white/20 backdrop-blur-md text-white p-2 rounded-xl flex items-center justify-center w-10 h-10 shadow-inner">
+                <i class="fa-solid fa-graduation-cap text-xl"></i>
+            </div>
+            <div>
+                <h1 class="font-extrabold text-lg leading-tight tracking-wide">स्पर्धा गुरु</h1>
+                <p class="text-[10px] text-blue-200 font-medium">Spardha Guru • Live Exam Prep</p>
+            </div>
+        </div>
+        <div id="sync-badge" class="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Live Server
+        </div>
+    </header>
+
+    <!-- Main Dynamic Container -->
+    <main id="main-container" class="flex-1 p-4 max-w-2xl mx-auto w-full pb-24">
+        <div class="text-center py-20 space-y-3">
+            <i class="fa-solid fa-spinner animate-spin text-4xl text-blue-600"></i>
+            <p class="text-sm font-bold text-slate-600 dark:text-slate-300">स्पर्धा गुरु डेटाबेस जोडला जात आहे...</p>
+        </div>
+    </main>
+
+    <!-- Professional Bottom Navigation Bar -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-slate-800/90 backdrop-blur-lg border-t border-slate-200 dark:border-slate-700 flex justify-around p-2 z-40 shadow-2xl">
+        <button onclick="switchView('dashboard')" id="nav-dashboard" class="nav-btn text-xs text-blue-600 font-bold flex flex-col items-center py-1 px-3 rounded-xl transition">
+            <i class="fa-solid fa-house-chimney text-lg mb-0.5"></i>मुख्य
+        </button>
+        <button onclick="switchView('exam')" id="nav-exam" class="nav-btn text-xs text-slate-500 dark:text-slate-400 flex flex-col items-center py-1 px-3 rounded-xl transition">
+            <i class="fa-solid fa-pen-to-square text-lg mb-0.5"></i>सराव परीक्षा
+        </button>
+        <button onclick="switchView('admin')" id="nav-admin" class="nav-btn text-xs text-slate-500 dark:text-slate-400 flex flex-col items-center py-1 px-3 rounded-xl transition">
+            <i class="fa-solid fa-user-gear text-lg mb-0.5"></i>ॲडमिन
+        </button>
+    </nav>
+
+    <!-- App Logic Script -->
+    <script>
+        let allQuestions = [];
+        let examQuestions = [];
+        let currentQIndex = 0;
+        let userAnswers = {};
+        let examTimer = null;
+        let timeLeft = 0;
+
+        // Fetch Questions from Firestore
+        async function fetchQuestions() {
+            try {
+                if(!window.fbDB) return [];
+                const querySnapshot = await window.fbGetDocs(window.fbCollection(window.fbDB, "questions"));
+                let list = [];
+                querySnapshot.forEach((doc) => {
+                    list.push({ id: doc.id, ...doc.data() });
+                });
+                allQuestions = list;
+                return list;
+            } catch (e) {
+                console.error("Firebase Read Error: ", e);
+                return [];
+            }
+        }
+
+        // Render Dashboard View
+        async function renderDashboard() {
+            updateNavState('nav-dashboard');
+            const container = document.getElementById('main-container');
+            const questions = await fetchQuestions();
+
+            container.innerHTML = `
+                <div class="space-y-5 animate-fade-in">
+                    <!-- Hero Banner -->
+                    <div class="relative overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 text-white p-6 rounded-3xl shadow-xl border border-blue-400/20">
+                        <div class="relative z-10 space-y-2">
+                            <span class="bg-white/20 backdrop-blur-md text-[11px] font-bold px-3 py-1 rounded-full text-blue-100 uppercase tracking-wider">MPSC • Police Bharti • Talathi</span>
+                            <h2 class="text-2xl font-black leading-tight pt-1">स्पर्धा गुरु सराव केंद्र</h2>
+                            <p class="text-xs text-blue-100/90">तुमचे स्वप्न, आमचे मार्गदर्शन! आजच मोफत सराव सुरू करा.</p>
+                            
+                            <div class="grid grid-cols-2 gap-3 pt-3">
+                                <div class="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/10">
+                                    <p class="text-[10px] text-blue-200">उपलब्ध प्रश्न</p>
+                                    <p class="text-xl font-black">${questions.length}</p>
+                                </div>
+                                <div class="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/10">
+                                    <p class="text-[10px] text-blue-200">एकूण विषय</p>
+                                    <p class="text-xl font-black">६+</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Subjects Selection -->
+                    <div>
+                        <h3 class="font-extrabold text-sm text-slate-700 dark:text-slate-200 mb-3 flex items-center justify-between">
+                            <span>विषयानुसार सराव</span>
+                            <span class="text-xs text-blue-600 font-semibold">सर्व पहा</span>
+                        </h3>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div onclick="startExamBySubject('all')" class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm hover:shadow-md transition cursor-pointer flex items-center space-x-3">
+                                <div class="p-3 bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300 rounded-xl"><i class="fa-solid fa-layer-group text-lg"></i></div>
+                                <div><h4 class="font-bold text-xs">सर्व विषय</h4><p class="text-[10px] text-slate-500">मिश्र सराव टेस्ट</p></div>
+                            </div>
+                            <div onclick="startExamBySubject('gk')" class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm hover:shadow-md transition cursor-pointer flex items-center space-x-3">
+                                <div class="p-3 bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300 rounded-xl"><i class="fa-solid fa-lightbulb text-lg"></i></div>
+                                <div><h4 class="font-bold text-xs">सामान्य ज्ञान</h4><p class="text-[10px] text-slate-500">GK Special</p></div>
+                            </div>
+                            <div onclick="startExamBySubject('history')" class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm hover:shadow-md transition cursor-pointer flex items-center space-x-3">
+                                <div class="p-3 bg-rose-100 text-rose-600 dark:bg-rose-900/40 dark:text-rose-300 rounded-xl"><i class="fa-solid fa-landmark text-lg"></i></div>
+                                <div><h4 class="font-bold text-xs">इतिहास</h4><p class="text-[10px] text-slate-500">History Prep</p></div>
+                            </div>
+                            <div onclick="startExamBySubject('geography')" class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm hover:shadow-md transition cursor-pointer flex items-center space-x-3">
+                                <div class="p-3 bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300 rounded-xl"><i class="fa-solid fa-earth-asia text-lg"></i></div>
+                                <div><h4 class="font-bold text-xs">भूगोल</h4><p class="text-[10px] text-slate-500">Geography</p></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Start Button -->
+                    <button onclick="startExamBySubject('all')" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-2xl font-extrabold text-sm shadow-lg shadow-blue-500/20 hover:scale-[1.01] active:scale-[0.98] transition flex justify-center items-center gap-2">
+                        <i class="fa-solid fa-bolt"></i> थेट सराव परीक्षा सुरू करा
+                    </button>
+                </div>
+            `;
+        }
+
+        // Start Exam Engine
+        function startExamBySubject(subject) {
+            if(allQuestions.length === 0) {
+                return alert("डेटाबेसमध्ये अद्याप प्रश्न जोडलेले नाहीत! कृपया ॲडमिन सेक्शनमध्ये जाऊन प्रश्न जोडा.");
+            }
+
+            examQuestions = subject === 'all' ? [...allQuestions] : allQuestions.filter(q => q.subject === subject);
+            
+            if(examQuestions.length === 0) {
+                return alert("या विषयासाठी प्रश्न उपलब्ध नाहीत. कृपया इतर विषय निवडा.");
+            }
+
+            currentQIndex = 0;
+            userAnswers = {};
+            timeLeft = examQuestions.length * 60; // 1 min per question
+            renderQuestionView();
+            startTimer();
+        }
+
+        // Render Single Question View
+        function renderQuestionView() {
+            updateNavState('nav-exam');
+            const container = document.getElementById('main-container');
+            const q = examQuestions[currentQIndex];
+
+            container.innerHTML = `
+                <div class="space-y-4">
+                    <!-- Exam Header & Timer -->
+                    <div class="flex justify-between items-center bg-white dark:bg-slate-800 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                        <span class="text-xs font-black text-blue-600 dark:text-blue-400">प्रश्न ${currentQIndex + 1} / ${examQuestions.length}</span>
+                        <div class="flex items-center gap-1.5 bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400 px-3 py-1 rounded-full text-xs font-extrabold border border-red-200/50">
+                            <i class="fa-solid fa-stopwatch animate-pulse"></i>
+                            <span id="timer-display">${formatTime(timeLeft)}</span>
+                        </div>
+                    </div>
+
+                    <!-- Question Card -->
+                    <div class="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+                        <h3 class="font-bold text-base text-slate-800 dark:text-slate-100 leading-snug">${q.q_mr}</h3>
+
+                        <div class="space-y-2.5">
+                            ${q.options_mr.map((opt, idx) => `
+                                <button onclick="selectOption(${idx})" class="w-full text-left p-3.5 rounded-2xl border text-xs font-semibold transition flex items-center justify-between ${userAnswers[currentQIndex] === idx ? 'border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-500' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50'}">
+                                    <span>${idx + 1}. ${opt}</span>${userAnswers[currentQIndex] === idx ? '<i class="fa-solid fa-circle-check text-blue-600 text-sm"></i>' : '<i class="fa-regular fa-circle text-slate-300 text-sm"></i>'}
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Navigation Controls -->
+                    <div class="flex justify-between gap-3 pt-2">
+                        <button onclick="prevQuestion()" ${currentQIndex === 0 ? 'disabled class="opacity-40 cursor-not-allowed bg-slate-200 dark:bg-slate-800 text-slate-500 px-5 py-3 rounded-xl text-xs font-bold"' : 'class="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-5 py-3 rounded-xl text-xs font-bold"'}>
+                            मागे
+                        </button>
+
+                        ${currentQIndex === examQuestions.length - 1 ? `
+                            <button onclick="submitExam()" class="flex-1 bg-emerald-600 text-white py-3 rounded-xl text-xs font-extrabold shadow-lg shadow-emerald-600/20">
+                                पेपर सबमिट करा
+                            </button>
+                        ` : `
+                            <button onclick="nextQuestion()" class="flex-1 bg-blue-600 text-white py-3 rounded-xl text-xs font-extrabold shadow-lg shadow-blue-600/20">
+                                पुढील प्रश्न
+                            </button>
+                        `}
+                    </div>
+                </div>
+            `;
+        }
+
+        function selectOption(optIndex) {
+            userAnswers[currentQIndex] = optIndex;
+            renderQuestionView();
+        }
+
+        function nextQuestion() {
+            if(currentQIndex < examQuestions.length - 1) {
+                currentQIndex++;
+                renderQuestionView();
+            }
+        }
+
+        function prevQuestion() {
+            if(currentQIndex > 0) {
+                currentQIndex--;
+                renderQuestionView();
+            }
+        }
+
+        function startTimer() {
+            clearInterval(examTimer);
+            examTimer = setInterval(() => {
+                if(timeLeft <= 0) {
+                    clearInterval(examTimer);
+                    alert("वेळ संपली आहे! पेपर ऑटो-सबमिट होत आहे.");
+                    submitExam();
+                } else {
+                    timeLeft--;
+                    const timerElem = document.getElementById('timer-display');
+                    if(timerElem) timerElem.innerText = formatTime(timeLeft);
+                }
+            }, 1000);
+        }
+
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = seconds % 60;
+            return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        // Submit & Show Result Analysis
+        function submitExam() {
+            clearInterval(examTimer);
+            let score = 0;
+            examQuestions.forEach((q, idx) => {
+                if(userAnswers[idx] === q.ans) score++;
+            });
+
+            const percentage = Math.round((score / examQuestions.length) * 100);
+            const container = document.getElementById('main-container');
+
+            container.innerHTML = `
+                <div class="space-y-5 animate-fade-in">
+                    <!-- Result Summary Card -->
+                    <div class="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 text-center shadow-lg space-y-3">
+                        <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto text-2xl font-black">
+                            ${percentage}%
+                        </div>
+                        <h2 class="text-xl font-black">परीक्षा निकाल</h2>
+                        <p class="text-xs text-slate-500">स्पर्धा गुरु सराव चाचणी गुणपत्रक</p>
+
+                        <div class="grid grid-cols-3 gap-2 pt-2 text-center">
+                            <div class="bg-slate-50 dark:bg-slate-700/50 p-2.5 rounded-xl border border-slate-200/50">
+                                <p class="text-[10px] text-slate-400">एकूण</p>
+                                <p class="font-extrabold text-sm">${examQuestions.length}</p>
+                            </div>
+                            <div class="bg-emerald-50 dark:bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-200/50 text-emerald-600">
+                                <p class="text-[10px]">बरोबर</p>
+                                <p class="font-extrabold text-sm">${score}</p>
+                            </div>
+                            <div class="bg-rose-50 dark:bg-rose-950/30 p-2.5 rounded-xl border border-rose-200/50 text-rose-600">
+                                <p class="text-[10px]">चुकीचे</p>
+                                <p class="font-extrabold text-sm">${examQuestions.length - score}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="renderDashboard()" class="w-full bg-blue-600 text-white py-3.5 rounded-2xl font-bold text-xs shadow-lg">
+                        मुख्य पृष्ठावर जा
+                    </button>
+                </div>
+            `;
+        }
+
+        // Admin Security Check & Panel
+        function renderAdmin() {
+            updateNavState('nav-admin');
+            const pwd = prompt("ॲडमिन पॅनेल उघडण्यासाठी पासवर्ड टाका:");
+            if(pwd !== "Htshp@1720") {
+                alert("चुकीचा पासवर्ड!");
+                renderDashboard();
+                return;
+            }
+
+            const container = document.getElementById('main-container');
+            container.innerHTML = `
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+                    <div class="border-b border-slate-200 dark:border-slate-700 pb-3 flex justify-between items-center">
+                        <div>
+                            <h3 class="font-black text-sm text-blue-600">स्पर्धा गुरु - Admin Control</h3>
+                            <p class="text-[11px] text-slate-400">थेट Firebase सर्व्हरवर प्रश्न जोडा</p>
+                        </div>
+                        <span class="text-[10px] bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-md">Admin Active</span>
+                    </div>
+
+                    <div>
+                        <label class="text-xs font-bold block mb-1">विषय निवडा</label>
+                        <select id="add-subject" class="w-full p-3 border rounded-xl text-xs dark:bg-slate-700 border-slate-200 dark:border-slate-600">
+                            <option value="gk">सामान्य ज्ञान (GK)</option>
+                            <option value="history">इतिहास</option>
+                            <option value="geography">भूगोल</option>
+                            <option value="polity">राज्यशास्त्र</option>
+                            <option value="science">विज्ञान</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="text-xs font-bold block mb-1">प्रश्न (मराठी)</label>
+                        <input type="text" id="add-q-mr" class="w-full p-3 border rounded-xl text-xs dark:bg-slate-700 border-slate-200 dark:border-slate-600" placeholder="येथे प्रश्न टाईप करा...">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="add-opt-0" class="p-2.5 border rounded-xl text-xs dark:bg-slate-700 border-slate-200 dark:border-slate-600" placeholder="पर्याय १">
+                        <input type="text" id="add-opt-1" class="p-2.5 border rounded-xl text-xs dark:bg-slate-700 border-slate-200 dark:border-slate-600" placeholder="पर्याय २">
+                        <input type="text" id="add-opt-2" class="p-2.5 border rounded-xl text-xs dark:bg-slate-700 border-slate-200 dark:border-slate-600" placeholder="पर्याय ३">
+                        <input type="text" id="add-opt-3" class="p-2.5 border rounded-xl text-xs dark:bg-slate-700 border-slate-200 dark:border-slate-600" placeholder="पर्याय ४">
+                    </div>
+
+                    <div>
+                        <label class="text-xs font-bold block mb-1">बरोबर उत्तर</label>
+                        <select id="add-ans" class="w-full p-3 border rounded-xl text-xs dark:bg-slate-700 border-slate-200 dark:border-slate-600">
+                            <option value="0">पर्याय १</option>
+                            <option value="1">पर्याय २</option>
+                            <option value="2">पर्याय ३</option>
+                            <option value="3">पर्याय ४</option>
+                        </select>
+                    </div>
+
+                    <button onclick="addQuestionToFirebase()" class="w-full bg-blue-600 text-white py-3.5 rounded-2xl font-bold text-xs shadow-lg shadow-blue-600/20">
+                        Firebase मध्ये प्रश्न सेव्ह करा
+                    </button>
+                </div>
+            `;
+        }
+
+        async function addQuestionToFirebase() {
+            const q_mr = document.getElementById('add-q-mr').value.trim();
+            const opt0 = document.getElementById('add-opt-0').value.trim();
+            const opt1 = document.getElementById('add-opt-1').value.trim();
+            const opt2 = document.getElementById('add-opt-2').value.trim();
+            const opt3 = document.getElementById('add-opt-3').value.trim();
+            const ans = parseInt(document.getElementById('add-ans').value);
+            const subject = document.getElementById('add-subject').value;
+
+            if(!q_mr || !opt0 || !opt1 || !opt2 || !opt3) {
+                return alert("कृपया सर्व माहिती पूर्ण भरा!");
+            }
+
+            const newQ = {
+                q_mr: q_mr,
+                options_mr: [opt0, opt1, opt2, opt3],
+                ans: ans,
+                subject: subject,
+                createdAt: new Date().toISOString()
+            };
+
+            try {
+                await window.fbAddDoc(window.fbCollection(window.fbDB, "questions"), newQ);
+                alert("प्रश्न 'स्पर्धा गुरु' डेटाबेसमध्ये सेव्ह झाला!");
+                renderDashboard();
+            } catch(e) {
+                alert("Error: " + e.message);
+            }
+        }
+
+        function updateNavState(activeId) {
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('text-blue-600', 'font-bold');
+                btn.classList.add('text-slate-500');
+            });
+            const activeNav = document.getElementById(activeId);
+            if(activeNav) {
+                activeNav.classList.remove('text-slate-500');
+                activeNav.classList.add('text-blue-600', 'font-bold');
+            }
+        }
+
+        function switchView(view) {
+            if(view === 'dashboard') renderDashboard();
+            if(view === 'exam') startExamBySubject('all');
+            if(view === 'admin') renderAdmin();
+        }
+
+        window.onload = () => renderDashboard();
+    </script>
+</body>
+</html>
